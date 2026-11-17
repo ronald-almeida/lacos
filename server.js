@@ -25,7 +25,7 @@ async function readJson(req) {
 }
 
 export function createApp({ gateway = new FirebotGateway(), store = createStore(process.env.DATABASE_PATH || './data/orders.sqlite'),
-  origin = process.env.PUBLIC_ORIGIN || 'http://127.0.0.1:3000', whatsappNumber = process.env.WHATSAPP_NUMBER,
+  origin = process.env.PUBLIC_ORIGIN || 'http://127.0.0.1:3000', whatsappNumber = process.env.WHATSAPP_NUMBER || '5575988393742',
   whatsappMessage = process.env.WHATSAPP_MESSAGE || 'Olá! Acabei de adquirir o Combo 4 em 1 e gostaria de receber meu acesso.' } = {}) {
   const secure = new URL(origin).protocol === 'https:';
   const inflight = new Map();

@@ -29,7 +29,7 @@ Defina no ambiente **do servidor**, nunca no navegador:
 
 - `FIREBOT_API_KEY`: chave privada da sua conta FireBot.
 - `PUBLIC_ORIGIN`: endereço HTTPS exato do checkout, sem caminho final. Usado como origem permitida e `storeUrl`.
-- `WHATSAPP_NUMBER`: número de destino com código do país e DDD, apenas dígitos. **Pendente de envio pelo responsável.**
+- `WHATSAPP_NUMBER`: número de destino com código do país e DDD, apenas dígitos. Padrão configurado: **5575988393742 — (75) 98839-3742**. Pode ser substituído pela variável de ambiente.
 - `WHATSAPP_MESSAGE`: texto pré-preenchido; há uma sugestão em `.env.example`.
 - `DATABASE_PATH`: caminho persistente para o banco SQLite de pedidos.
 - `HOST` / `PORT`: interface e porta do servidor; para container use `0.0.0.0`.
