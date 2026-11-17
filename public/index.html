@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Combo 4 em 1 • Laços e Caprichos</title>
+  <meta name="description" content="Combo 4 em 1 Laços e Caprichos. Acesso vitalício por R$ 97 à vista no Pix, com bônus inclusos.">
+  <meta name="theme-color" content="#050505">
+  <link rel="icon" href="/assets/product.jpg"><link rel="stylesheet" href="/style.css">
+  <script type="module" src="/checkout.js"></script>
+</head>
+<body>
+  <main class="checkout-shell">
+    <header class="hero"><img src="/assets/banner-pix.png" width="1674" height="940" fetchpriority="high" alt="Super Combo 4 em 1, com acesso vitalício. R$ 97 à vista no Pix. Oferta para 20 pessoas."></header>
+    <div class="checkout-grid">
+      <div class="checkout-column">
+        <section class="product-intro" aria-labelledby="product-name">
+          <img src="/assets/product.jpg" alt="Laços e Caprichos" width="128" height="128">
+          <div><h1 id="product-name">COMBO 4 EM 1 BLACK 25</h1><p>(Método Laços e Caprichos PRO) · (MasterClass Laços Encantados) · (Coleção Essencial Newborn) · (MLC 2.0)</p><span class="lifetime">Acesso vitalício + bônus inclusos</span></div>
+        </section>
+        <form id="checkout-form" class="checkout-card">
+          <div class="section-title"><span class="step">1</span><h2>Seus dados</h2><span class="country">🇧🇷 Brasil</span></div>
+          <p class="section-description">Preencha com atenção para receber seu acesso.</p>
+          <div class="fields">
+            <div class="field"><label for="name">Nome completo</label><input id="name" name="name" autocomplete="name" placeholder="Seu nome e sobrenome" required minlength="5" maxlength="120"></div>
+            <div class="field"><label for="email">E-mail</label><input id="email" name="email" type="email" autocomplete="email" placeholder="Seu melhor e-mail" required maxlength="254"></div>
+            <div class="field-row">
+              <div class="field"><label for="document">CPF ou CNPJ</label><input id="document" name="document" inputmode="numeric" placeholder="000.000.000-00" required maxlength="18" autocomplete="off"></div>
+              <div class="field"><label for="phone">Telefone com DDD</label><div class="phone-wrap"><span>+55</span><input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(00) 00000-0000" required maxlength="15"></div></div>
+            </div>
+          </div>
+          <div class="section-title payment-title"><span class="step">2</span><h2>Pagamento</h2></div>
+          <div class="pix-method"><svg class="pix-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="m12 4 4-4 4 4-4 4zm-8 8L0 16l4 4 8-8 4 4 4-4 8 8 4-4-4-4-8 8-4-4-4 4zm8 16 4 4 4-4-4-4z"/></svg><div><strong>Pix</strong><span>À vista, sem parcelamento</span></div><span class="selected-mark" aria-label="Selecionado">✓</span></div>
+          <div class="pix-info"><strong>Informações sobre o pagamento via Pix</strong><ul><li>Valor do combo à vista: <b>R$ 97,00.</b></li><li>Pague com o aplicativo do seu banco.</li><li>Use o QR Code ou o código Pix copia e cola.</li><li>Acesso liberado após a confirmação do pagamento.</li></ul></div>
+          <div class="section-title extras-title"><span class="step">3</span><h2>Aproveite também</h2><span class="optional">Opcional</span></div>
+          <div class="bump-list">
+            <label class="bump" for="bump-service"><span class="bump-heading">SIM, EU ACEITO ESSA OFERTA ESPECIAL!</span><span class="bump-content"><input id="bump-service" type="checkbox" name="bump" value="guia-atendimento"><span class="bump-copy"><strong>Guia de Atendimento ao Cliente</strong><span>OFERTA DE BLACK SÓ HOJE</span></span><span class="bump-price">R$ 19,90<small>à vista no Pix</small></span></span></label>
+            <label class="bump" for="bump-packaging"><span class="bump-heading">SIM, EU ACEITO ESSA OFERTA ESPECIAL!</span><span class="bump-content"><input id="bump-packaging" type="checkbox" name="bump" value="guia-embalagens"><span class="bump-copy"><strong>Guia Prático de Embalagens Criativas</strong><span>OFERTA DE BLACK SÓ HOJE</span></span><span class="bump-price">R$ 9,90<small>à vista no Pix</small></span></span></label>
+          </div>
+          <section class="order-summary" aria-labelledby="summary-title"><h2 id="summary-title">Resumo do pedido</h2><div id="summary-items"><div class="summary-line"><span>Combo 4 em 1</span><span>R$ 97,00</span></div></div><div class="summary-total"><div><strong>Total</strong><span>À vista no Pix</span></div><output id="total" aria-live="polite">R$ 97,00</output></div></section>
+          <p id="form-error" class="error-message" role="alert" hidden></p>
+          <button id="pay-button" class="primary-button" type="submit" disabled><span>Pagar agora</span><span aria-hidden="true">→</span></button>
+          <p class="payment-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5zM12 14v3"/></svg>Pagamento único · Sem mensalidades</p>
+          <p class="consent">Ao clicar em “Pagar agora”, declaro que conferi meus dados, os produtos selecionados e o valor total da compra. Estou ciente de que o pagamento será realizado à vista via Pix e de que o acesso será disponibilizado após sua confirmação.</p>
+          <details class="privacy"><summary>Como seus dados são utilizados</summary><p>Seus dados são utilizados para identificar a compra, gerar e verificar o pagamento e prestar atendimento relacionado ao seu acesso. As informações necessárias ao pagamento são enviadas ao serviço responsável pela cobrança. Não salvamos CPF, telefone, nome ou e-mail no navegador.</p></details>
+        </form>
+      </div>
+      <aside class="bonus-column"><img src="/assets/bonus.png" alt="Bônus inclusos: os quatro bônus da oferta original, grátis na compra do combo." width="300" height="398" loading="eager"></aside>
+    </div>
+    <footer class="page-footer">Laços e Caprichos <span>•</span> Combo 4 em 1</footer>
+    <noscript><p class="error-message">Ative o JavaScript do navegador para selecionar as ofertas e gerar seu pagamento Pix.</p></noscript>
+  </main>
+</body>
+</html>
