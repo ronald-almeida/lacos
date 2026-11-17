@@ -31,7 +31,7 @@ Defina no ambiente **do servidor**, nunca no navegador:
 - `PUBLIC_ORIGIN`: endereço HTTPS exato do checkout, sem caminho final. Usado como origem permitida e `storeUrl`.
 - `WHATSAPP_NUMBER`: número de destino com código do país e DDD, apenas dígitos. Padrão configurado: **5575988393742 — (75) 98839-3742**. Pode ser substituído pela variável de ambiente.
 - `WHATSAPP_MESSAGE`: texto pré-preenchido; há uma sugestão em `.env.example`.
-- `DATABASE_PATH`: caminho persistente para o banco SQLite de pedidos.
+- `DATABASE_PATH`: caminho persistente para o banco SQLite de pedidos, apenas na execução local/container.
 - `HOST` / `PORT`: interface e porta do servidor; para container use `0.0.0.0`.
 
 A criação de cobrança retorna indisponibilidade quando falta a chave, a URL HTTPS ou o WhatsApp. Nenhuma chave de outro projeto foi copiada. A integração está implementada, mas uma cobrança real paga ainda precisa ser validada após a configuração.
@@ -56,13 +56,19 @@ Se a criação sofrer timeout, erro 5xx ou resposta inválida, o pedido entra em
 
 ## Hospedagem
 
-O servidor usa SQLite persistente e foi preparado para **um serviço Node.js com disco persistente**, ou container. Não publique como site somente estático nem use disco temporário de funções serverless para os pedidos. Para Vercel Functions, primeiro substitua `lib/store.js` por um armazenamento remoto com operação atômica de reserva/idempotência.
+Na **Vercel**, `api/index.js` executa o servidor em Node.js 24 na região São Paulo (`gru1`). As páginas e imagens são servidas da pasta `public`; `/pagamento` e `/obrigado` têm rotas próprias. O build roda as verificações e os testes antes de publicar.
+
+Conecte um **Vercel Blob privado**, também em `gru1`, ao projeto. A conexão fornece `BLOB_STORE_ID` e autenticação OIDC; não é necessário colocar uma chave de armazenamento no código. Configure `FIREBOT_API_KEY` no ambiente Production. `PUBLIC_ORIGIN` pode informar o domínio definitivo; se ausente, a função usa `VERCEL_PROJECT_PRODUCTION_URL`, fornecida pela Vercel. Ao mudar variáveis, faça um novo deploy.
+
+O armazenamento remoto usa um documento privado por sessão, leituras sem cache e escritas condicionais por ETag. A reserva e a idempotência são atômicas mesmo entre instâncias diferentes da função. Uma falha no armazenamento bloqueia a criação da cobrança. O código Pix fica no armazenamento privado; dados cadastrais não são persistidos. Registros de pedidos não expiram automaticamente; contadores de limite expiram em um dia. O acesso por sessão dura 30 dias.
+
+Na execução local ou em container, o servidor continua usando SQLite persistente. Não use SQLite em disco temporário de funções serverless.
 
 O `Dockerfile` inclui apenas a aplicação e suas dependências de execução. Monte um volume em `/app/data`, forneça as variáveis pelo ambiente e coloque HTTPS na frente do serviço. Ao usar proxy, configure limites de requisição na borda; o limite local usa o endereço do socket, sem confiar em cabeçalhos forjáveis.
 
 ## Verificação
 
-16 testes cobrem combinações de preços, adulteração de valores, CPF/CNPJ, ID e valor da transação, concorrência, retomada, respostas incertas, rejeição definitiva, isolamento de sessões, reembolso e persistência após reabrir o banco.
+22 testes cobrem combinações de preços, adulteração de valores, CPF/CNPJ, ID e valor da transação, concorrência entre funções independentes, reserva atômica remota, retomada, respostas incertas, rejeição definitiva, isolamento de sessões, reembolso e persistência após reabrir o banco. Os testes do Blob usam um serviço simulado com controle de versão.
 
 O fluxo de navegador foi conferido localmente: escolher os dois adicionais → total R$ 126,80 → QR Code/copia e cola → página de obrigado após confirmação simulada → link WhatsApp. Não foi criada nem paga uma cobrança real.
 

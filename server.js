@@ -16,6 +16,12 @@ const types = { '.html':'text/html; charset=utf-8', '.css':'text/css; charset=ut
 
 async function readJson(req) {
   if (!req.headers['content-type']?.startsWith('application/json')) throw error(415,'Formato de solicitação inválido.');
+  // Vercel may parse JSON before invoking this handler.
+  if (req.body !== undefined) {
+    const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    if (Buffer.byteLength(body) > 8192) throw error(413,'Solicitação muito grande.');
+    try { return JSON.parse(body); } catch { throw error(400,'Solicitação inválida.'); }
+  }
   let body = '';
   for await (const chunk of req) {
     body += chunk;
@@ -26,6 +32,7 @@ async function readJson(req) {
 
 export function createApp({ gateway = new FirebotGateway(), store = createStore(process.env.DATABASE_PATH || './data/orders.sqlite'),
   origin = process.env.PUBLIC_ORIGIN || 'http://127.0.0.1:3000', whatsappNumber = process.env.WHATSAPP_NUMBER || '5575988393742',
+  clientAddress = req => req.socket.remoteAddress || 'unknown',
   whatsappMessage = process.env.WHATSAPP_MESSAGE || 'Olá! Acabei de adquirir o Combo 4 em 1 e gostaria de receber meu acesso.' } = {}) {
   const secure = new URL(origin).protocol === 'https:';
   const inflight = new Map();
@@ -60,13 +67,13 @@ export function createApp({ gateway = new FirebotGateway(), store = createStore(
           (o.status === 'paid' && !['paid','refunded'].includes(charge.status))) {
         throw error(502,'Não foi possível verificar o pagamento. Tente novamente em instantes.');
       }
-      store.status(o.id, charge.status);
-      return store.get(o.id);
+      await store.status(o.id, charge.status, o.owner);
+      return store.get(o.id, o.owner);
     })();
     inflight.set(o.id,task);
     try { return await task; } finally { inflight.delete(o.id); }
   }
-  const server = createServer(async (req,res) => {
+  const handler = async (req,res) => {
     res.setHeader('X-Content-Type-Options','nosniff');
     res.setHeader('Referrer-Policy','no-referrer');
     res.setHeader('X-Frame-Options','DENY');
@@ -86,38 +93,41 @@ export function createApp({ gateway = new FirebotGateway(), store = createStore(
           try { customer=validateCustomer(input.customer); items=orderItems(input.bumps); } catch(e) { throw error(400,e.message); }
           const amount = items.reduce((total,item)=>total+item.price,0);
           const fingerprint = hash(JSON.stringify({customer,items}));
-          let existing = store.find(owner,input.requestKey);
+          let existing = await store.find(owner,input.requestKey);
           if (existing) {
             if (existing.fingerprint !== fingerprint) throw error(409,'Este pedido já foi iniciado com outros dados. Retome o pagamento existente.');
             return json(res,200,await publicOrder(existing));
           }
-          existing=store.active(owner);
+          existing=await store.active(owner);
           if (existing) return json(res,409,{message:'Você já tem um pagamento em andamento. Retome esse pedido antes de gerar outro.',orderId:existing.id});
           gateway.assertReady();
           if (!whatsapp) throw error(503,'O atendimento está sendo preparado. Tente novamente mais tarde.');
-          // Use the actual socket address; untrusted forwarded headers must not bypass limits.
-          if (!store.allow(`create:${hash(req.socket.remoteAddress || 'unknown')}`,10,3600000)) throw error(429,'Muitas tentativas. Aguarde antes de tentar novamente.');
+          if (!await store.allow(`create:${hash(clientAddress(req))}`,10,3600000)) throw error(429,'Muitas tentativas. Aguarde antes de tentar novamente.');
           const id=randomUUID();
-          store.insert({id,owner,key:input.requestKey,fingerprint,amount,items});
+          const reserved=await store.insert({id,owner,key:input.requestKey,fingerprint,amount,items});
+          if (!reserved.created) {
+            if (reserved.order.request_key===input.requestKey && reserved.order.fingerprint===fingerprint) return json(res,200,await publicOrder(reserved.order));
+            return json(res,409,{message:'Você já tem um pagamento em andamento. Retome esse pedido antes de gerar outro.',orderId:reserved.order.id});
+          }
           try {
             const charge=await gateway.createCharge({reference:id,amountCents:amount,customer,items});
             if (!charge || typeof charge.id!=='string' || charge.id.length>200 || typeof charge.code!=='string' ||
                 charge.code.length<20 || charge.code.length>4096 || charge.amountCents!==amount ||
                 (charge.expiresAt && (!Number.isFinite(Date.parse(charge.expiresAt)) || Date.parse(charge.expiresAt)<=Date.now()))) throw new Error('Invalid gateway response');
-            store.charge(id,charge);
+            await store.charge(id,charge,owner);
           } catch (e) {
-            if(e.uncertain === false){store.status(id,'failed');return json(res,502,{message:e.message,resetRequest:true});}
+            if(e.uncertain === false){await store.status(id,'failed',owner);return json(res,502,{message:e.message,resetRequest:true});}
             // Never retry blindly: the provider may have created the charge before timing out.
-            store.status(id,'creation_unknown');
-            return json(res,202,await publicOrder(store.get(id)));
+            await store.status(id,'creation_unknown',owner);
+            return json(res,202,await publicOrder(await store.get(id,owner)));
           }
-          return json(res,201,await publicOrder(store.get(id)));
+          return json(res,201,await publicOrder(await store.get(id,owner)));
         }
         const match=url.pathname.match(/^\/api\/orders\/([a-f0-9-]{36})$/);
         if (req.method==='GET' && match) {
-          const o=store.get(match[1]);
+          if (!await store.allow(`status:${owner}`,120,60000)) throw error(429,'Aguarde alguns instantes para consultar novamente.');
+          const o=await store.get(match[1],owner);
           if (!o || o.owner!==owner) throw error(404,'Pedido não encontrado neste navegador.');
-          if (!store.allow(`status:${owner}`,120,60000)) throw error(429,'Aguarde alguns instantes para consultar novamente.');
           return json(res,200,await publicOrder(await refresh(o)));
         }
         throw error(404,'Página não encontrada.');
@@ -136,9 +146,10 @@ export function createApp({ gateway = new FirebotGateway(), store = createStore(
       if (res.headersSent) return res.end();
       json(res,e.status || 502,{message:e.status ? e.message : 'Não foi possível consultar o pagamento. Tente novamente em instantes.'});
     }
-  });
+  };
+  const server = createServer(handler);
   server.requestTimeout=30000;
-  return {server,store};
+  return {server,store,handler};
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-const files=['server.js',...['lib','public','scripts','test'].flatMap(dir=>readdirSync(dir).filter(f=>f.endsWith('.js')).map(f=>join(dir,f)))];
+const files=['server.js',...['api','lib','public','scripts','test'].flatMap(dir=>readdirSync(dir).filter(f=>f.endsWith('.js')).map(f=>join(dir,f)))];
 for(const file of files){const result=spawnSync(process.execPath,['--check',file],{stdio:'inherit'});if(result.status!==0)process.exit(1);}
 for(const name of ['index.html','payment.html','thanks.html']){
   const html=readFileSync(join('public',name),'utf8');
