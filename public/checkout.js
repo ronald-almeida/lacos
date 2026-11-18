@@ -48,10 +48,9 @@ async function initialize(){
     if(id){
       try{
         const o=await api(`/api/orders/${encodeURIComponent(id)}`);
-        if(['pending','creating','creation_unknown'].includes(o.status)){
-          const link=document.createElement('a');link.href=`/pagamento?pedido=${encodeURIComponent(id)}`;link.className='secondary-button';link.textContent='Retomar meu pagamento Pix';
-          form.prepend(link);
-        }else{forget('checkout-order');requestKey=crypto.randomUUID();save('checkout-request',requestKey);}
+        if(!['pending','creating','creation_unknown'].includes(o.status)){
+          forget('checkout-order');requestKey=crypto.randomUUID();save('checkout-request',requestKey);
+        }
       }catch(e){if(e.status===404){forget('checkout-order');requestKey=crypto.randomUUID();save('checkout-request',requestKey);}}
     }
   }catch{showError(message,'Não foi possível carregar a oferta. Atualize a página para tentar novamente.');}
