@@ -7,8 +7,6 @@ const app = createApp({
   origin,
   gateway: new FirebotGateway({ storeUrl: origin }),
   store: new BlobStore(),
-  // Only this Vercel entry point trusts the IP header overwritten by its edge.
-  clientAddress: req => req.headers['x-vercel-forwarded-for'] || req.socket.remoteAddress || 'unknown',
 });
 
 export default app.handler;

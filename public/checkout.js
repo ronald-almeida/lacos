@@ -1,12 +1,13 @@
-import {api,money,summary,save,saved,forget,showError} from './shared.js';
+import {api,money,summary,save,forget,showError} from './shared.js';
 const form=document.querySelector('#checkout-form');
 const button=document.querySelector('#pay-button');
 const message=document.querySelector('#form-error');
 const checkboxes=[...form.querySelectorAll('[name=bump]')];
 const fields=Object.fromEntries(['name','email','document','phone'].map(name=>[name,form.elements.namedItem(name)]));
 let catalog;
-let requestKey=saved('checkout-request') || crypto.randomUUID();
-save('checkout-request',requestKey);
+// Returning to the checkout starts a fresh attempt, even for the same CPF/cart.
+let requestKey=crypto.randomUUID();
+forget('checkout-request');
 function selected(){return checkboxes.filter(c=>c.checked).map(c=>c.value);}
 function renderSummary(){
   if(!catalog)return;
@@ -37,7 +38,7 @@ form.addEventListener('submit',async event=>{
         break;
       }catch(e){
         if(e.status!==409||!e.resetRequest||attempt>0)throw e;
-        requestKey=crypto.randomUUID();save('checkout-request',requestKey);
+        requestKey=crypto.randomUUID();
       }
     }
     const expectedItems=[catalog.product,...catalog.bumps.filter(b=>payload.bumps.includes(b.id))];
@@ -48,7 +49,7 @@ form.addEventListener('submit',async event=>{
     save('checkout-order',order.id);
     location.assign(`/pagamento?pedido=${encodeURIComponent(order.id)}`);
   }catch(e){
-    if(e.resetRequest){requestKey=crypto.randomUUID();save('checkout-request',requestKey);}
+    if(e.resetRequest)requestKey=crypto.randomUUID();
     showError(message,e.name==='TimeoutError'?'A consulta demorou mais que o esperado. Tente novamente para retomar o mesmo pedido.':e.message);
     message.scrollIntoView({behavior:'smooth',block:'center'});
     button.disabled=false;button.firstElementChild.textContent='Pagar agora';
@@ -58,15 +59,6 @@ form.addEventListener('submit',async event=>{
 async function initialize(){
   try{
     catalog=await api('/api/catalog');renderSummary();
-    const id=saved('checkout-order');
-    if(id){
-      try{
-        const o=await api(`/api/orders/${encodeURIComponent(id)}`);
-        if(!['pending','creating','creation_unknown'].includes(o.status)){
-          forget('checkout-order');requestKey=crypto.randomUUID();save('checkout-request',requestKey);
-        }
-      }catch(e){if(e.status===404){forget('checkout-order');requestKey=crypto.randomUUID();save('checkout-request',requestKey);}}
-    }
     button.disabled=false;
   }catch{showError(message,'Não foi possível carregar a oferta. Atualize a página para tentar novamente.');}
 }

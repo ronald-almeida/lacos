@@ -50,11 +50,11 @@ As chaves e os dados pessoais não são registrados em logs. O banco guarda prod
 
 ## Retomada e respostas incertas
 
-Cada tentativa tem uma chave de idempotência local e uma reserva persistida **antes** da chamada ao provedor. Cliques repetidos retomam o pedido. Sessões usam cookie HttpOnly/SameSite; outro navegador não consulta o pedido.
+Cada abertura do checkout inicia uma tentativa independente, mesmo com o mesmo CPF, os mesmos dados e os mesmos itens. Não há limite de gerações por CPF, IP ou quantidade de pedidos na sessão imposto pela aplicação. Cada tentativa tem uma chave de idempotência em memória e uma reserva persistida **antes** da chamada ao provedor: reenvios da mesma tentativa não geram cobranças duplicadas. Sessões usam cookie HttpOnly/SameSite; outro navegador não consulta o pedido.
 
-Ao alterar dados ou opcionais, o checkout usa uma nova tentativa e uma cobrança com os itens e o total recalculados no servidor. Um Pix pendente só é reutilizado para a mesma seleção e os mesmos dados; envios concorrentes iguais continuam gerando uma única cobrança. Códigos anteriores permanecem vinculados aos seus próprios itens e valores, sem cancelamento presumido no provedor. Pedidos em criação ou com resultado incerto ainda impedem outra cobrança até a situação ser esclarecida.
+Cada nova tentativa gera seu próprio Pix com os itens e o total recalculados no servidor. Pedidos anteriores, inclusive pendentes ou com geração incerta, não bloqueiam novas tentativas. Códigos anteriores permanecem vinculados aos seus próprios itens e valores, sem cancelamento presumido no provedor.
 
-Se a criação sofrer timeout, erro 5xx ou resposta inválida, o pedido entra em `creation_unknown` e não é reenviado automaticamente: a cobrança pode existir na FireBot. O operador deve conferir no painel a referência `Pedido <id>` incluída na descrição, antes de qualquer nova tentativa. Não foi presumido suporte a cabeçalho de idempotência ou endpoint de cancelamento não documentado. Rejeições HTTP definitivas permitem uma nova tentativa.
+Se a criação sofrer timeout, erro 5xx ou resposta inválida, a tentativa entra em `creation_unknown` e não é reenviada automaticamente: a cobrança pode existir na FireBot. A referência `Pedido <id>` na descrição permite conferir cada tentativa no provedor. O cliente pode voltar ao checkout e iniciar outra geração. Não foi presumido suporte a cabeçalho de idempotência ou endpoint de cancelamento não documentado.
 
 ## Hospedagem
 
@@ -66,11 +66,11 @@ O armazenamento remoto usa um documento privado por sessão, leituras sem cache 
 
 Na execução local ou em container, o servidor continua usando SQLite persistente. Não use SQLite em disco temporário de funções serverless.
 
-O `Dockerfile` inclui apenas a aplicação e suas dependências de execução. Monte um volume em `/app/data`, forneça as variáveis pelo ambiente e coloque HTTPS na frente do serviço. Ao usar proxy, configure limites de requisição na borda; o limite local usa o endereço do socket, sem confiar em cabeçalhos forjáveis.
+O `Dockerfile` inclui apenas a aplicação e suas dependências de execução. Monte um volume em `/app/data`, forneça as variáveis pelo ambiente e coloque HTTPS na frente do serviço. Consultas de status têm limite por sessão; esse limite não se aplica à criação de novos Pix.
 
 ## Verificação
 
-22 testes cobrem combinações de preços, adulteração de valores, CPF/CNPJ, ID e valor da transação, concorrência entre funções independentes, reserva atômica remota, retomada, respostas incertas, rejeição definitiva, isolamento de sessões, reembolso e persistência após reabrir o banco. Os testes do Blob usam um serviço simulado com controle de versão.
+Os testes cobrem gerações repetidas com o mesmo CPF, combinações de preços, adulteração de valores, CPF/CNPJ, ID e valor da transação, concorrência entre funções independentes, reserva atômica remota, reenvios da mesma tentativa, respostas incertas, rejeição definitiva, isolamento de sessões, reembolso e persistência após reabrir o banco. Os testes do Blob usam um serviço simulado com controle de versão.
 
 O fluxo de navegador foi conferido localmente: escolher os dois adicionais → total R$ 126,80 → QR Code/copia e cola → página de obrigado após confirmação simulada → link WhatsApp. Não foi criada nem paga uma cobrança real.
 

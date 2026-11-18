@@ -35,8 +35,8 @@ async function refresh(){
       check.hidden=false;forget('checkout-order');forget('checkout-request');
     }else{
       document.querySelector('#payment-title').textContent='Estamos verificando seu Pix';
-      document.querySelector('#payment-description').textContent='A geração ainda não foi confirmada. Não inicie outro pedido para evitar duplicidade. Guarde esta página e consulte novamente.';
-      check.hidden=false;
+      document.querySelector('#payment-description').textContent='A geração deste Pix ainda não foi confirmada. Você pode consultar novamente ou voltar ao checkout para gerar um novo Pix.';
+      check.hidden=false;document.querySelector('#restart').hidden=false;
     }
   }catch(e){
     document.querySelector('#loader').hidden=true;

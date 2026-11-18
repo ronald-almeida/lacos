@@ -32,7 +32,6 @@ async function readJson(req) {
 
 export function createApp({ gateway = new FirebotGateway(), store = createStore(process.env.DATABASE_PATH || './data/orders.sqlite'),
   origin = process.env.PUBLIC_ORIGIN || 'http://127.0.0.1:3000', whatsappNumber = process.env.WHATSAPP_NUMBER || '5575988393742',
-  clientAddress = req => req.socket.remoteAddress || 'unknown',
   whatsappMessage = process.env.WHATSAPP_MESSAGE || 'Olá! Acabei de adquirir o Combo 4 em 1 e gostaria de receber meu acesso.' } = {}) {
   const secure = new URL(origin).protocol === 'https:';
   const inflight = new Map();
@@ -95,15 +94,13 @@ export function createApp({ gateway = new FirebotGateway(), store = createStore(
           const fingerprint = hash(JSON.stringify({customer,items}));
           async function existingOrder(order) {
             if (order.fingerprint === fingerprint) return json(res,200,await publicOrder(order));
-            // A changed cart needs its own attempt; never send the previous cart's QR.
-            if (order.request_key === input.requestKey) return json(res,409,{resetRequest:true});
-            return json(res,409,{message:'Seu Pix anterior ainda está sendo verificado. Tente novamente em instantes.'});
+            return json(res,409,{resetRequest:true});
           }
-          const existing = await store.find(owner,input.requestKey) || await store.active(owner,fingerprint);
+          // Deduplicate only retries of this attempt, never the customer's CPF or prior orders.
+          const existing = await store.find(owner,input.requestKey);
           if (existing) return await existingOrder(existing);
           gateway.assertReady();
           if (!whatsapp) throw error(503,'O atendimento está sendo preparado. Tente novamente mais tarde.');
-          if (!await store.allow(`create:${hash(clientAddress(req))}`,10,3600000)) throw error(429,'Muitas tentativas. Aguarde antes de tentar novamente.');
           const id=randomUUID();
           const reserved=await store.insert({id,owner,key:input.requestKey,fingerprint,amount,items});
           if (!reserved.created) return await existingOrder(reserved.order);
