@@ -95,7 +95,7 @@ export function createApp({ gateway = new FirebotGateway(), store = createStore(
           const fingerprint = hash(JSON.stringify({customer,items}));
           let existing = await store.find(owner,input.requestKey);
           if (existing) {
-            if (existing.fingerprint !== fingerprint) throw error(409,'Este pedido já foi iniciado com outros dados. Retome o pagamento existente.');
+            if (existing.fingerprint !== fingerprint) return json(res,409,{orderId:existing.id});
             return json(res,200,await publicOrder(existing));
           }
           existing=await store.active(owner);

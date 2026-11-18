@@ -58,6 +58,18 @@ test('a new key cannot create a second active charge',async t=>{
   const second=await app.request('/api/orders',input());
   assert.equal(second.status,409);assert.equal(second.body.orderId,first.body.id);assert.equal(app.calls(),1);
 });
+test('changed checkout details recover the existing payment without a blocking message',async t=>{
+  const app=await setup(t);const body=input();
+  const first=await app.request('/api/orders',body);
+  for(const changes of [{customer:{...customer,email:'outro@example.com'}},{bumps:['guia-atendimento']}]){
+    const retry=await app.request('/api/orders',{...body,...changes});
+    assert.equal(retry.status,409);
+    assert.deepEqual(retry.body,{orderId:first.body.id});
+    const payment=await app.request(`/api/orders/${retry.body.orderId}`);
+    assert.equal(payment.body.status,'pending');assert.equal(payment.body.amount,9700);
+  }
+  assert.equal(app.calls(),1);
+});
 test('ambiguous timeout retains the order and blocks duplicate creation',async t=>{
   let calls=0;
   const app=await setup(t,{gateway:{assertReady(){},async createCharge(){calls++;throw new GatewayError(true);}}});
