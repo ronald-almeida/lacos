@@ -27,23 +27,37 @@ form.addEventListener('submit',async event=>{
   event.preventDefault();
   if(button.disabled)return;
   message.hidden=true;button.disabled=true;button.firstElementChild.textContent='Preparando seu Pix…';
+  const payload={bumps:selected(),customer:{name:fields.name.value,email:fields.email.value,document:fields.document.value,phone:fields.phone.value}};
+  checkboxes.forEach(c=>{c.disabled=true;});
   try{
-    const order=await api('/api/orders',{method:'POST',body:JSON.stringify({
-      requestKey,bumps:selected(),customer:{name:fields.name.value,email:fields.email.value,document:fields.document.value,phone:fields.phone.value},
-    })});
+    let order;
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        order=await api('/api/orders',{method:'POST',body:JSON.stringify({...payload,requestKey})});
+        break;
+      }catch(e){
+        if(e.status!==409||!e.resetRequest||attempt>0)throw e;
+        requestKey=crypto.randomUUID();save('checkout-request',requestKey);
+      }
+    }
+    const expectedItems=[catalog.product,...catalog.bumps.filter(b=>payload.bumps.includes(b.id))];
+    if(order.amount!==expectedItems.reduce((sum,item)=>sum+item.price,0)||
+        JSON.stringify(order.items.map(item=>item.id))!==JSON.stringify(expectedItems.map(item=>item.id))){
+      throw new Error('O valor do Pix não corresponde aos itens selecionados. Atualize a página e tente novamente.');
+    }
     save('checkout-order',order.id);
     location.assign(`/pagamento?pedido=${encodeURIComponent(order.id)}`);
   }catch(e){
     if(e.resetRequest){requestKey=crypto.randomUUID();save('checkout-request',requestKey);}
-    if(e.orderId){save('checkout-order',e.orderId);location.assign(`/pagamento?pedido=${encodeURIComponent(e.orderId)}`);return;}
     showError(message,e.name==='TimeoutError'?'A consulta demorou mais que o esperado. Tente novamente para retomar o mesmo pedido.':e.message);
     message.scrollIntoView({behavior:'smooth',block:'center'});
     button.disabled=false;button.firstElementChild.textContent='Pagar agora';
+    checkboxes.forEach(c=>{c.disabled=false;});
   }
 });
 async function initialize(){
   try{
-    catalog=await api('/api/catalog');renderSummary();button.disabled=false;
+    catalog=await api('/api/catalog');renderSummary();
     const id=saved('checkout-order');
     if(id){
       try{
@@ -53,6 +67,7 @@ async function initialize(){
         }
       }catch(e){if(e.status===404){forget('checkout-order');requestKey=crypto.randomUUID();save('checkout-request',requestKey);}}
     }
+    button.disabled=false;
   }catch{showError(message,'Não foi possível carregar a oferta. Atualize a página para tentar novamente.');}
 }
 initialize();

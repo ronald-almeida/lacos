@@ -93,22 +93,20 @@ export function createApp({ gateway = new FirebotGateway(), store = createStore(
           try { customer=validateCustomer(input.customer); items=orderItems(input.bumps); } catch(e) { throw error(400,e.message); }
           const amount = items.reduce((total,item)=>total+item.price,0);
           const fingerprint = hash(JSON.stringify({customer,items}));
-          let existing = await store.find(owner,input.requestKey);
-          if (existing) {
-            if (existing.fingerprint !== fingerprint) return json(res,409,{orderId:existing.id});
-            return json(res,200,await publicOrder(existing));
+          async function existingOrder(order) {
+            if (order.fingerprint === fingerprint) return json(res,200,await publicOrder(order));
+            // A changed cart needs its own attempt; never send the previous cart's QR.
+            if (order.request_key === input.requestKey) return json(res,409,{resetRequest:true});
+            return json(res,409,{message:'Seu Pix anterior ainda está sendo verificado. Tente novamente em instantes.'});
           }
-          existing=await store.active(owner);
-          if (existing) return json(res,409,{message:'Você já tem um pagamento em andamento. Retome esse pedido antes de gerar outro.',orderId:existing.id});
+          const existing = await store.find(owner,input.requestKey) || await store.active(owner,fingerprint);
+          if (existing) return await existingOrder(existing);
           gateway.assertReady();
           if (!whatsapp) throw error(503,'O atendimento está sendo preparado. Tente novamente mais tarde.');
           if (!await store.allow(`create:${hash(clientAddress(req))}`,10,3600000)) throw error(429,'Muitas tentativas. Aguarde antes de tentar novamente.');
           const id=randomUUID();
           const reserved=await store.insert({id,owner,key:input.requestKey,fingerprint,amount,items});
-          if (!reserved.created) {
-            if (reserved.order.request_key===input.requestKey && reserved.order.fingerprint===fingerprint) return json(res,200,await publicOrder(reserved.order));
-            return json(res,409,{message:'Você já tem um pagamento em andamento. Retome esse pedido antes de gerar outro.',orderId:reserved.order.id});
-          }
+          if (!reserved.created) return await existingOrder(reserved.order);
           try {
             const charge=await gateway.createCharge({reference:id,amountCents:amount,customer,items});
             if (!charge || typeof charge.id!=='string' || charge.id.length>200 || typeof charge.code!=='string' ||

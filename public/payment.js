@@ -1,4 +1,4 @@
-import {api,money,save,forget,showError} from './shared.js';
+import {api,money,summary,save,forget,showError} from './shared.js';
 const id=new URLSearchParams(location.search).get('pedido');
 const error=document.querySelector('#payment-error');
 const check=document.querySelector('#check-payment');
@@ -23,6 +23,7 @@ async function refresh(){
       document.querySelector('#payment-description').textContent='Seu combo está quase nas suas mãos. Faça o pagamento para concluir a compra.';
       document.querySelector('#payment-details').hidden=false;
       document.querySelector('#payment-amount').textContent=money(o.amount);
+      summary(document.querySelector('#payment-items'),o.items);
       document.querySelector('#qr-image').src=o.qrImage;
       document.querySelector('#pix-code').value=o.code;
       check.hidden=false;countdown();clearInterval(clock);clock=setInterval(countdown,1000);

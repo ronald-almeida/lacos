@@ -53,29 +53,54 @@ test('same request key and concurrent submission create only one charge',async t
   assert.equal(app.calls(),1);assert.equal(results[0].body.id,results[1].body.id);
   assert.equal((await app.request('/api/orders',{...body,bumps:['guia-atendimento']})).status,409);
 });
-test('a new key cannot create a second active charge',async t=>{
+test('a new key reuses a pending charge only when customer and cart match',async t=>{
   const app=await setup(t);const first=await app.request('/api/orders',input());
   const second=await app.request('/api/orders',input());
-  assert.equal(second.status,409);assert.equal(second.body.orderId,first.body.id);assert.equal(app.calls(),1);
+  assert.equal(second.status,200);assert.equal(second.body.id,first.body.id);assert.equal(app.calls(),1);
 });
-test('changed checkout details recover the existing payment without a blocking message',async t=>{
+test('changing optional items after a base Pix generates the selected total and preserves earlier orders',async t=>{
   const app=await setup(t);const body=input();
   const first=await app.request('/api/orders',body);
-  for(const changes of [{customer:{...customer,email:'outro@example.com'}},{bumps:['guia-atendimento']}]){
-    const retry=await app.request('/api/orders',{...body,...changes});
-    assert.equal(retry.status,409);
-    assert.deepEqual(retry.body,{orderId:first.body.id});
-    const payment=await app.request(`/api/orders/${retry.body.orderId}`);
-    assert.equal(payment.body.status,'pending');assert.equal(payment.body.amount,9700);
+  let previous=body;
+  for(const [bumps,total] of [[['guia-atendimento'],11690],[['guia-atendimento','guia-embalagens'],12680],[['guia-embalagens'],10690]]){
+    const conflict=await app.request('/api/orders',{...previous,bumps});
+    assert.equal(conflict.status,409);assert.deepEqual(conflict.body,{resetRequest:true});
+    previous={...previous,requestKey:randomUUID(),bumps};
+    const created=await app.request('/api/orders',previous);
+    assert.equal(created.status,201);assert.equal(created.body.amount,total);assert.notEqual(created.body.id,first.body.id);
+    assert.deepEqual(created.body.items.slice(1).map(item=>item.id),bumps);
+    const payment=await app.request(`/api/orders/${created.body.id}`);
+    assert.equal(payment.body.amount,total);
+    assert.equal([...app.charges.values()].at(-1).amountCents,total);
   }
-  assert.equal(app.calls(),1);
+  const original=await app.request(`/api/orders/${first.body.id}`);
+  assert.equal(original.body.amount,9700);assert.equal(original.body.items.length,1);
+  const repeated=await app.request('/api/orders',input(['guia-atendimento','guia-embalagens']));
+  assert.equal(repeated.status,200);assert.equal(repeated.body.amount,12680);
+  assert.equal(app.calls(),4);
+});
+test('concurrent submissions of an updated cart create just one charge for the new total',async t=>{
+  const app=await setup(t);await app.request('/api/orders',input());
+  const results=await Promise.all([app.request('/api/orders',input(['guia-atendimento'])),app.request('/api/orders',input(['guia-atendimento']))]);
+  assert.equal(results[0].body.id,results[1].body.id);
+  assert.equal(results[0].body.amount,11690);assert.equal(app.calls(),2);
+});
+test('changed customer data does not reuse a charge with earlier customer details',async t=>{
+  const app=await setup(t);const first=await app.request('/api/orders',input());
+  const next=await app.request('/api/orders',{...input(['guia-embalagens']),customer:{...customer,email:'outro@example.com'}});
+  assert.equal(next.status,201);assert.notEqual(next.body.id,first.body.id);
+  assert.equal([...app.charges.values()].at(-1).customer.email,'outro@example.com');
+  assert.equal(next.body.amount,10690);
 });
 test('ambiguous timeout retains the order and blocks duplicate creation',async t=>{
   let calls=0;
   const app=await setup(t,{gateway:{assertReady(){},async createCharge(){calls++;throw new GatewayError(true);}}});
   const body=input();const first=await app.request('/api/orders',body);
   assert.equal(first.status,202);assert.equal(first.body.status,'creation_unknown');
-  await app.request('/api/orders',body);await app.request('/api/orders',input());assert.equal(calls,1);
+  await app.request('/api/orders',body);await app.request('/api/orders',input());
+  const changed=await app.request('/api/orders',input(['guia-atendimento']));
+  assert.equal(changed.status,409);assert.equal(changed.body.orderId,undefined);assert.equal(changed.body.code,undefined);
+  assert.equal(calls,1);
 });
 test('definitive gateway rejection allows a new request',async t=>{
   const app=await setup(t,{gateway:{assertReady(){},async createCharge(){throw new GatewayError(false);}}});

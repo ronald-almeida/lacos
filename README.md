@@ -52,6 +52,8 @@ As chaves e os dados pessoais não são registrados em logs. O banco guarda prod
 
 Cada tentativa tem uma chave de idempotência local e uma reserva persistida **antes** da chamada ao provedor. Cliques repetidos retomam o pedido. Sessões usam cookie HttpOnly/SameSite; outro navegador não consulta o pedido.
 
+Ao alterar dados ou opcionais, o checkout usa uma nova tentativa e uma cobrança com os itens e o total recalculados no servidor. Um Pix pendente só é reutilizado para a mesma seleção e os mesmos dados; envios concorrentes iguais continuam gerando uma única cobrança. Códigos anteriores permanecem vinculados aos seus próprios itens e valores, sem cancelamento presumido no provedor. Pedidos em criação ou com resultado incerto ainda impedem outra cobrança até a situação ser esclarecida.
+
 Se a criação sofrer timeout, erro 5xx ou resposta inválida, o pedido entra em `creation_unknown` e não é reenviado automaticamente: a cobrança pode existir na FireBot. O operador deve conferir no painel a referência `Pedido <id>` incluída na descrição, antes de qualquer nova tentativa. Não foi presumido suporte a cabeçalho de idempotência ou endpoint de cancelamento não documentado. Rejeições HTTP definitivas permitem uma nova tentativa.
 
 ## Hospedagem

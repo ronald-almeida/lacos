@@ -61,8 +61,21 @@ test('Blob persists uncertain reservations and permits another order only after 
   await store.insert(o);
   await store.status(o.id, 'creation_unknown', o.owner);
   assert.equal((await new BlobStore(service).insert(reservation())).created, false);
+  assert.equal((await new BlobStore(service).insert(reservation({fingerprint:'changed-cart',amount:12680}))).created, false);
   await store.status(o.id, 'failed', o.owner);
   assert.equal((await new BlobStore(service).insert(reservation())).created, true);
+});
+
+test('separate Blob clients reserve one updated cart without reusing the previous amount', async () => {
+  const service=storageService(), a=new BlobStore(service), b=new BlobStore(service), original=reservation();
+  await a.insert(original);
+  await a.charge(original.id,{id:'old-pix',code:'original-code',expiresAt:null},original.owner);
+  const next=reservation({fingerprint:'both-extras',amount:12680});
+  const results=await Promise.all([a.insert(next),b.insert({...next,id:randomUUID(),key:randomUUID()})]);
+  assert.equal(results.filter(result=>result.created).length,1);
+  assert.equal(results[0].order.id,results[1].order.id);
+  assert.equal(results[0].order.amount,12680);assert.notEqual(results[0].order.id,original.id);
+  assert.equal((await b.get(original.id,original.owner)).amount,9700);
 });
 
 test('Blob rate limits remain atomic under concurrent function calls', async () => {
@@ -90,7 +103,7 @@ test('two independent HTTP functions sharing Blob create only one payment', asyn
   let calls = 0;
   const gateway = { assertReady() {}, async createCharge({ amountCents }) {
     calls++;
-    return { id: 'fire_tx_test', amountCents, code: '000201-TESTE-LOCAL-SEM-VALOR-NAO-PAGAR', expiresAt: null };
+    return { id: `fire_tx_test_${calls}`, amountCents, code: '000201-TESTE-LOCAL-SEM-VALOR-NAO-PAGAR', expiresAt: null };
   } };
   const servers = [];
   for (let i = 0; i < 2; i++) {
@@ -109,4 +122,13 @@ test('two independent HTTP functions sharing Blob create only one payment', asyn
   }));
   assert.equal(calls, 1);
   assert.equal(results[0].id, results[1].id);
+  const updated=await Promise.all(servers.map(async server=>{
+    const response=await fetch(`http://127.0.0.1:${server.address().port}/api/orders`,{
+      method:'POST',headers:{origin:'http://checkout.local','content-type':'application/json',cookie:`checkout_session=${'a'.repeat(64)}`},
+      body:JSON.stringify({...body,requestKey:randomUUID(),bumps:['guia-atendimento','guia-embalagens']}),
+    });
+    assert.ok([200,201].includes(response.status));return response.json();
+  }));
+  assert.equal(calls,2);assert.equal(updated[0].id,updated[1].id);
+  assert.notEqual(updated[0].id,results[0].id);assert.equal(updated[0].amount,12680);
 });
